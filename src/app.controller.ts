@@ -8,7 +8,11 @@ import { PrismaService } from './prisma/prisma.service';
 export class UpdateProfileDto {
   @IsOptional()
   @IsString()
-  fullName?: string;
+  firstName?: string;
+
+  @IsOptional()
+  @IsString()
+  lastName?: string;
 
   @IsOptional()
   @IsString()
@@ -35,7 +39,8 @@ export class AppController {
         profile: {
           select: {
             id: true,
-            fullName: true,
+            firstName: true,
+            lastName: true,
             avatarUrl: true,
             createdAt: true,
             updatedAt: true,
@@ -64,16 +69,19 @@ export class AppController {
       where: { userId: req.user.userId },
       create: {
         userId: req.user.userId,
-        fullName: body.fullName ?? null,
+        firstName: body.firstName ?? null,
+        lastName: body.lastName ?? null,
         avatarUrl: body.avatarUrl ?? null,
       },
       update: {
-        ...(body.fullName !== undefined && { fullName: body.fullName }),
+        ...(body.firstName !== undefined && { firstName: body.firstName }),
+        ...(body.lastName !== undefined && { lastName: body.lastName }),
         ...(body.avatarUrl !== undefined && { avatarUrl: body.avatarUrl }),
       },
       select: {
         id: true,
-        fullName: true,
+        firstName: true,
+        lastName: true,
         avatarUrl: true,
         createdAt: true,
         updatedAt: true,

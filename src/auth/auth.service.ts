@@ -10,7 +10,7 @@ export class AuthService {
         private jwt: JwtService,
     ) { }
 
-    async register(email: string, password: string) {
+    async register(email: string, password: string, firstName: string, lastName: string) {
         try {
             const hashed = await bcrypt.hash(password, 10);
 
@@ -19,7 +19,10 @@ export class AuthService {
                     email,
                     password: hashed,
                     profile: {
-                        create: {},
+                        create: {
+                            firstName: firstName || null,
+                            lastName: lastName || null,
+                        },
                     },
                 },
                 select: {
@@ -27,6 +30,12 @@ export class AuthService {
                     email: true,
                     createdAt: true,
                     updatedAt: true,
+                    profile: {
+                        select: {
+                            firstName: true,
+                            lastName: true,
+                        },
+                    },
                 },
             });
 
@@ -38,6 +47,8 @@ export class AuthService {
                 user: {
                     id: user.id,
                     email: user.email,
+                    firstName: user.profile?.firstName ?? null,
+                    lastName: user.profile?.lastName ?? null,
                     createdAt: user.createdAt,
                     updatedAt: user.updatedAt,
                 },
@@ -65,16 +76,29 @@ export class AuthService {
             update: {},
         });
 
+        const userWithProfile = await this.prisma.user.findUnique({
+            where: { id: user.id },
+            select: {
+                id: true,
+                email: true,
+                createdAt: true,
+                updatedAt: true,
+                profile: { select: { firstName: true, lastName: true } },
+            },
+        });
+
         const payload = { sub: user.id, email: user.email };
         const access_token = this.jwt.sign(payload, { expiresIn: '1h' });
 
         return {
             access_token,
             user: {
-                id: user.id,
-                email: user.email,
-                createdAt: user.createdAt,
-                updatedAt: user.updatedAt,
+                id: userWithProfile!.id,
+                email: userWithProfile!.email,
+                firstName: userWithProfile!.profile?.firstName ?? null,
+                lastName: userWithProfile!.profile?.lastName ?? null,
+                createdAt: userWithProfile!.createdAt,
+                updatedAt: userWithProfile!.updatedAt,
             },
         };
     }
