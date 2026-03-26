@@ -79,16 +79,43 @@ Créez un fichier `.env` à la racine du projet (ne commitez pas les secrets).
 | `ANTHROPIC_API_KEY` | Non | Clé API Anthropic (si fonctionnalités IA) | `sk-ant-...` |
 | `FRONTEND_URL` | Non | URL du front (CORS / redirections) | `http://localhost:3001` |
 | `PRINT_SECRET` | Non | Secret pour impression/export sécurisé | Chaîne secrète |
+| `BREVO_API_KEY` | Non (mail) | **Recommandé** — Clé API Brevo (envoi par API, pas SMTP) | [Clés API](https://app.brevo.com/settings/keys/api) |
+| `BREVO_USER` | Non (mail) | Identifiant SMTP Brevo (si envoi par SMTP) | Voir [Brevo](#brevo-emails) |
+| `BREVO_SMTP_KEY` | Non (mail) | Clé SMTP Brevo (si envoi par SMTP) | Voir [Brevo](#brevo-emails) |
 
 Exemple minimal `.env` :
 
 ```env
 PORT=3000
 JWT_SECRET=votre_secret_jwt_long_et_aleatoire_16_caracteres_min
-JWT_EXPIRES_IN=1h
 BCRYPT_SALT_ROUNDS=10
 DATABASE_URL=postgresql://user:password@localhost:5432/cv_builder
 ```
+
+#### Brevo (emails)
+
+Pour envoyer des e-mails (bienvenue, etc.) avec [Brevo](https://www.brevo.com/), **deux options** :
+
+**Option 1 — Clé API (recommandée, évite les erreurs SMTP 535)**  
+1. Allez sur [app.brevo.com/settings/keys/api](https://app.brevo.com/settings/keys/api) (Paramètres → SMTP & API → **Clés API**).  
+2. Créez une clé API ou copiez une clé existante.  
+3. Dans votre `.env` :
+
+```env
+BREVO_API_KEY=xkeysib-votre-cle-api-...
+MAIL_FROM="Mon App" <noreply@votredomaine.com>
+```
+
+`MAIL_FROM` doit être une adresse **vérifiée** dans Brevo (Expéditeurs / Senders). Sans `MAIL_FROM`, l’expéditeur par défaut est `"Mon App" <noreply@monapp.com>` (à configurer côté Brevo si besoin).
+
+**Option 2 — SMTP**  
+1. Page [Clés SMTP](https://app.brevo.com/settings/keys/smtp).  
+2. **`BREVO_USER`** = identifiant SMTP affiché ; **`BREVO_SMTP_KEY`** = clé générée via « Générer une clé SMTP » (pas la clé API).  
+3. `.env` : `BREVO_USER=...` et `BREVO_SMTP_KEY=...`
+
+En cas d’erreur **535 Authentication failed** avec le SMTP, utilisez l’**Option 1** (clé API) à la place.
+
+Sans aucune de ces variables, l’API démarre mais l’envoi d’e-mails échouera.
 
 ### Base de données
 

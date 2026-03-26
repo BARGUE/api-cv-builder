@@ -19,6 +19,13 @@ async function bootstrap() {
 
   const app = await NestFactory.create(AppModule, expressAdapter);
 
+  app.enableCors({
+    origin: true, // en dev accepte toute origine (localhost:3000, localhost:3001, etc.)
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

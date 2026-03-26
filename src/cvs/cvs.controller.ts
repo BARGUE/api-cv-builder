@@ -15,17 +15,6 @@ export class CvsController {
     }
 
     @UseGuards(JwtAuthGuard)
-    @Get(':id/download')
-    async downloadPdf(@Param('id') id: string, @Req() req: any): Promise<StreamableFile> {
-        const buffer = await this.cvs.getPdfBuffer(id, req.user.userId);
-        const filename = `cv-${id}.pdf`;
-        return new StreamableFile(buffer, {
-            type: 'application/pdf',
-            disposition: `attachment; filename="${filename}"`,
-        });
-    }
-
-    @UseGuards(JwtAuthGuard)
     @Get(':id')
     findOne(@Param('id') id: string, @Req() req: any) {
         return this.cvs.findOne(id, req.user.userId);
