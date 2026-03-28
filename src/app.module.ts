@@ -7,6 +7,7 @@ import { CvsModule } from './cvs/cvs.module';
 import { AppController } from './app.controller';
 import { envSchema } from './config/env.schema';
 import { PrismaModule } from './prisma/prisma.module';
+import { MailModule } from './mail/mail.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     AuthModule,
     CvsModule,
+    MailModule
   ],
   controllers: [AppController],
 })
