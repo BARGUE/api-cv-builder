@@ -1,6 +1,14 @@
 # API CV Builder
 
-API REST NestJS pour créer, modifier et exporter des CV au format PDF. Authentification JWT, base PostgreSQL avec Prisma, et génération de PDF via Playwright.
+API REST construite avec **NestJS 11** pour la gestion de comptes utilisateurs, de profils et de CV. Elle expose une authentification par JWT, une persistance **PostgreSQL** via **Prisma 7**, et un endpoint de formulaire de contact par e-mail.
+
+<p>
+  <img alt="NestJS" src="https://img.shields.io/badge/NestJS-11-E0234E?logo=nestjs&logoColor=white">
+  <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript&logoColor=white">
+  <img alt="Prisma" src="https://img.shields.io/badge/Prisma-7-2D3748?logo=prisma&logoColor=white">
+  <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-UNLICENSED-lightgrey">
+</p>
 
 ---
 
@@ -10,177 +18,177 @@ API REST NestJS pour créer, modifier et exporter des CV au format PDF. Authenti
 - [Prérequis](#prérequis)
 - [Installation](#installation)
 - [Configuration](#configuration)
-- [Commandes](#commandes)
-- [Structure du projet](#structure-du-projet)
+- [Base de données](#base-de-données)
+- [Démarrage](#démarrage)
+- [Scripts](#scripts)
+- [Architecture](#architecture)
 - [Modèle de données](#modèle-de-données)
 - [Endpoints API](#endpoints-api)
 - [Tests](#tests)
 - [Déploiement](#déploiement)
+- [Licence](#licence)
 
 ---
 
 ## Vue d'ensemble
 
 | Élément | Détail |
-|--------|--------|
-| **Framework** | NestJS 11 |
-| **Base de données** | PostgreSQL (Prisma 7) |
-| **Auth** | JWT (Passport) |
-| **Validation** | class-validator + Zod (config) |
-| **PDF** | Playwright (rendu HTML → PDF) |
-| **Node** | ES2023, TypeScript 5.7 |
+|---|---|
+| **Framework** | NestJS 11 (Express) |
+| **Langage** | TypeScript 5.9 |
+| **Base de données** | PostgreSQL |
+| **ORM** | Prisma 7 (adaptateur `@prisma/adapter-pg`) |
+| **Authentification** | JWT via Passport (`passport-jwt`) |
+| **Hachage** | bcrypt |
+| **Validation** | `class-validator` / `class-transformer` (requêtes) + `zod` (variables d'environnement) |
+| **E-mail** | `@nestjs-modules/mailer` + Nodemailer (SMTP Gmail) |
 
-Fonctionnalités principales :
+### Fonctionnalités
 
-- **Auth** : inscription, connexion, changement de mot de passe
-- **Profil** : `GET /me`, mise à jour profil et mot de passe
-- **CV** : CRUD, téléchargement PDF, champs personnalisables (expériences, formation, compétences, langues)
+- **Authentification** — inscription et connexion, émission d'un JWT (validité 1 h).
+- **Compte** — récupération du compte connecté, mise à jour du profil et changement de mot de passe.
+- **CV** — CRUD complet des CV rattachés à l'utilisateur, avec blocs structurés (expériences, formation, compétences, langues).
+- **Contact** — envoi d'un e-mail de contact formaté en HTML à une adresse de destination configurée.
+
+> **Note** — Certaines dépendances présentes dans `package.json` (Playwright, `pdf-parse`, SDK Anthropic, React Email) sont destinées à des fonctionnalités futures (export PDF, import de CV, assistance IA) et **ne sont pas encore branchées** dans le code de l'API.
 
 ---
 
 ## Prérequis
 
-- **Node.js** 18+ (recommandé 20+)
-- **npm** 9+
-- **PostgreSQL** (local ou fournisseur type Neon, Supabase, etc.)
-- **Git**
+- **Node.js** 20 ou supérieur
+- **npm** 9 ou supérieur
+- **PostgreSQL** (instance locale ou hébergée : Neon, Supabase, Railway, etc.)
 
 ---
 
 ## Installation
 
 ```bash
-# Cloner le dépôt (si ce n'est pas déjà fait)
+# Cloner le dépôt
 git clone <url-du-repo>
 cd api-cv-builder
 
 # Installer les dépendances
 npm install
-
-# Générer le client Prisma (après avoir configuré DATABASE_URL)
-npx prisma generate
 ```
 
 ---
 
 ## Configuration
 
-### Variables d'environnement
+Créez un fichier `.env` à la racine du projet. Les variables sont **validées au démarrage** par un schéma Zod ([src/config/env.schema.ts](src/config/env.schema.ts)) — l'application refuse de démarrer si une variable requise est absente ou invalide.
 
-Créez un fichier `.env` à la racine du projet (ne commitez pas les secrets).
+| Variable | Requis | Description | Exemple |
+|---|:---:|---|---|
+| `DATABASE_URL` | ✅ | URL de connexion PostgreSQL | `postgresql://user:pass@host:5432/db?sslmode=require` |
+| `JWT_SECRET` | ✅ | Secret de signature des JWT (min. 16 caractères) | Chaîne longue et aléatoire |
+| `MAIL_USER` | ✅ | Adresse Gmail utilisée pour l'envoi (SMTP) | `contact@gmail.com` |
+| `MAIL_PASS` | ✅ | Mot de passe d'application Gmail | *(voir ci-dessous)* |
+| `MAIL_TO` | ✅ | Adresse destinataire du formulaire de contact | `you@example.com` |
+| `PORT` | ❌ | Port d'écoute (défaut : `3000`) | `3000` |
+| `ANTHROPIC_API_KEY` | ❌ | Clé API Anthropic (fonctionnalités IA à venir) | `sk-ant-...` |
 
-| Variable | Obligatoire | Description | Exemple |
-|----------|-------------|-------------|---------|
-| `DATABASE_URL` | Oui | URL de connexion PostgreSQL | `postgresql://user:pass@host:5432/db?sslmode=require` |
-| `PORT` | Non | Port du serveur (défaut: 3000) | `3000` |
-| `JWT_SECRET` | Oui | Secret pour signer les JWT (min. 16 caractères) | Chaîne longue et aléatoire |
-| `JWT_EXPIRES_IN` | Non | Durée de validité du token (défaut: 1h) | `1h`, `7d` |
-| `BCRYPT_SALT_ROUNDS` | Non | Coût bcrypt (8–15, défaut: 10) | `10` |
-| `ANTHROPIC_API_KEY` | Non | Clé API Anthropic (si fonctionnalités IA) | `sk-ant-...` |
-| `FRONTEND_URL` | Non | URL du front (CORS / redirections) | `http://localhost:3001` |
-| `PRINT_SECRET` | Non | Secret pour impression/export sécurisé | Chaîne secrète |
-| `BREVO_API_KEY` | Non (mail) | **Recommandé** — Clé API Brevo (envoi par API, pas SMTP) | [Clés API](https://app.brevo.com/settings/keys/api) |
-| `BREVO_USER` | Non (mail) | Identifiant SMTP Brevo (si envoi par SMTP) | Voir [Brevo](#brevo-emails) |
-| `BREVO_SMTP_KEY` | Non (mail) | Clé SMTP Brevo (si envoi par SMTP) | Voir [Brevo](#brevo-emails) |
-
-Exemple minimal `.env` :
+### Exemple de `.env`
 
 ```env
-PORT=3000
-JWT_SECRET=votre_secret_jwt_long_et_aleatoire_16_caracteres_min
-BCRYPT_SALT_ROUNDS=10
 DATABASE_URL=postgresql://user:password@localhost:5432/cv_builder
+JWT_SECRET=un_secret_long_et_aleatoire_de_16_caracteres_minimum
+PORT=3000
+
+# E-mail (formulaire de contact)
+MAIL_USER=contact@gmail.com
+MAIL_PASS=xxxx-xxxx-xxxx-xxxx
+MAIL_TO=destinataire@example.com
 ```
 
-#### Brevo (emails)
+### Configuration e-mail (Gmail)
 
-Pour envoyer des e-mails (bienvenue, etc.) avec [Brevo](https://www.brevo.com/), **deux options** :
+L'envoi utilise le SMTP Gmail (`smtp.gmail.com:587`, configuré dans [src/mail/mail.module.ts](src/mail/mail.module.ts)). Gmail n'accepte pas le mot de passe de compte pour le SMTP : générez un **mot de passe d'application**.
 
-**Option 1 — Clé API (recommandée, évite les erreurs SMTP 535)**  
-1. Allez sur [app.brevo.com/settings/keys/api](https://app.brevo.com/settings/keys/api) (Paramètres → SMTP & API → **Clés API**).  
-2. Créez une clé API ou copiez une clé existante.  
-3. Dans votre `.env` :
+1. Activez la **validation en deux étapes** sur votre compte Google.
+2. Rendez-vous sur [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords) et générez un mot de passe d'application.
+3. Renseignez `MAIL_USER` (l'adresse Gmail) et `MAIL_PASS` (le mot de passe d'application généré).
 
-```env
-BREVO_API_KEY=xkeysib-votre-cle-api-...
-MAIL_FROM="Mon App" <noreply@votredomaine.com>
-```
+---
 
-`MAIL_FROM` doit être une adresse **vérifiée** dans Brevo (Expéditeurs / Senders). Sans `MAIL_FROM`, l’expéditeur par défaut est `"Mon App" <noreply@monapp.com>` (à configurer côté Brevo si besoin).
+## Base de données
 
-**Option 2 — SMTP**  
-1. Page [Clés SMTP](https://app.brevo.com/settings/keys/smtp).  
-2. **`BREVO_USER`** = identifiant SMTP affiché ; **`BREVO_SMTP_KEY`** = clé générée via « Générer une clé SMTP » (pas la clé API).  
-3. `.env` : `BREVO_USER=...` et `BREVO_SMTP_KEY=...`
-
-En cas d’erreur **535 Authentication failed** avec le SMTP, utilisez l’**Option 1** (clé API) à la place.
-
-Sans aucune de ces variables, l’API démarre mais l’envoi d’e-mails échouera.
-
-### Base de données
+Le client Prisma est généré dans `generated/prisma` (voir le bloc `generator` de [prisma/schema.prisma](prisma/schema.prisma)). La configuration de la datasource et des migrations se trouve dans [prisma.config.ts](prisma.config.ts).
 
 ```bash
-# Appliquer les migrations
+# Générer le client Prisma
+npx prisma generate
+
+# Appliquer les migrations (production)
 npx prisma migrate deploy
 
-# (En dev) Réinitialiser la base et réappliquer les migrations
-npx prisma migrate reset
+# Créer / appliquer une migration (développement)
+npx prisma migrate dev
+
+# Explorer la base avec Prisma Studio
+npx prisma studio
 ```
 
 ---
 
-## Commandes
+## Démarrage
+
+```bash
+# Mode développement (rechargement à chaud)
+npm run start:dev
+
+# Mode production
+npm run build
+npm run start:prod
+```
+
+L'API écoute par défaut sur `http://localhost:3000`. Le CORS est activé pour toutes les origines avec support des cookies (adapter en production).
+
+---
+
+## Scripts
 
 | Commande | Description |
-|----------|-------------|
-| `npm run build` | Compile le projet TypeScript dans `dist/` |
-| `npm run start` | Démarre l'app (après build) |
-| `npm run start:dev` | Démarre en mode watch (rechargement à chaque modification) |
-| `npm run start:debug` | Démarre avec debug Node (watch) |
-| `npm run start:prod` | Lance `node dist/main` (pour production) |
-| `npm run lint` | Lance ESLint et applique les correctifs automatiques |
-| `npm run format` | Formate le code avec Prettier (`src/`, `test/`) |
+|---|---|
+| `npm run start` | Démarre l'application |
+| `npm run start:dev` | Démarre en mode watch (rechargement à chaud) |
+| `npm run start:debug` | Démarre en mode watch avec le débogueur Node |
+| `npm run start:prod` | Exécute la build compilée (`node dist/main`) |
+| `npm run build` | Compile le projet dans `dist/` |
+| `npm run lint` | Lance ESLint avec correction automatique |
+| `npm run format` | Formate le code avec Prettier |
 | `npm run test` | Lance les tests unitaires (Jest) |
-| `npm run test:watch` | Tests en mode watch |
+| `npm run test:watch` | Tests unitaires en mode watch |
 | `npm run test:cov` | Tests avec rapport de couverture |
 | `npm run test:e2e` | Tests end-to-end |
 
-### Prisma
-
-| Commande | Description |
-|----------|-------------|
-| `npx prisma generate` | Régénère le client Prisma dans `generated/prisma` |
-| `npx prisma migrate dev` | Crée/applique une migration en dev |
-| `npx prisma migrate deploy` | Applique les migrations en production |
-| `npx prisma migrate reset` | Réinitialise la base et réapplique les migrations |
-| `npx prisma studio` | Ouvre l'interface Prisma Studio sur la base |
-
 ---
 
-## Structure du projet
+## Architecture
 
 ```
 api-cv-builder/
 ├── prisma/
-│   ├── schema.prisma      # Modèles et config Prisma
-│   └── migrations/        # Migrations SQL
+│   ├── schema.prisma        # Modèles de données
+│   └── migrations/          # Migrations SQL
 ├── generated/
-│   └── prisma/            # Client Prisma généré (ne pas éditer)
+│   └── prisma/              # Client Prisma généré (ne pas éditer)
 ├── src/
-│   ├── main.ts            # Point d'entrée, config Express & ValidationPipe
-│   ├── app.module.ts      # Module racine
-│   ├── app.controller.ts  # Routes /me, /me/profile, /me/password
+│   ├── main.ts              # Point d'entrée : Express, CORS, ValidationPipe
+│   ├── app.module.ts        # Module racine (validation env, imports)
+│   ├── app.controller.ts    # Routes /me, /me/profile, /me/password
 │   ├── config/
-│   │   └── env.schema.ts  # Schéma Zod des variables d'env
-│   ├── auth/              # Inscription, login, JWT, guards
-│   ├── cvs/               # CRUD CV, export PDF
-│   ├── users/             # Logique métier utilisateurs
-│   └── prisma/            # Module et service Prisma
-├── test/                  # Tests E2E
-├── .env                   # Variables d'environnement (à créer, ne pas commiter)
+│   │   └── env.schema.ts     # Schéma Zod des variables d'environnement
+│   ├── auth/                # Inscription, connexion, JWT, guard, stratégie
+│   ├── cvs/                 # CRUD des CV
+│   ├── users/               # Module utilisateurs
+│   ├── mail/                # Formulaire de contact (POST /contact)
+│   └── prisma/              # Module et service Prisma
+├── test/                    # Tests end-to-end
+├── prisma.config.ts
 ├── nest-cli.json
 ├── tsconfig.json
-├── prisma.config.ts       # Config Prisma (schema, migrations, datasource)
 └── package.json
 ```
 
@@ -188,11 +196,40 @@ api-cv-builder/
 
 ## Modèle de données
 
-- **User** : `id`, `email`, `password`, `createdAt`, `updatedAt` — lien 1:1 avec `Profile`, 1:n avec `Cv`.
-- **Profile** : `userId`, `fullName`, `avatarUrl` (table `profiles`).
-- **Cv** : `userId`, `title`, `template`, `accentColor`, `photoUrl`, champs texte (fullName, jobTitle, email, phone, location, summary), blocs JSON (experiences, education, skills, languages), `currentStep`, `completed` (table `cvs`).
+Défini dans [prisma/schema.prisma](prisma/schema.prisma).
 
-Les migrations sont dans `prisma/migrations/`. Le client est généré dans `generated/prisma` (config dans `schema.prisma`).
+### `User`
+Compte utilisateur. Relation 1‑1 avec `Profile`, 1‑n avec `Cv`.
+
+| Champ | Type | Détail |
+|---|---|---|
+| `id` | `String` | Identifiant (cuid) |
+| `email` | `String` | Unique |
+| `password` | `String` | Haché avec bcrypt |
+| `createdAt` / `updatedAt` | `DateTime` | Horodatage |
+
+### `Profile` (table `profiles`)
+
+| Champ | Type | Détail |
+|---|---|---|
+| `userId` | `String` | Clé étrangère unique (cascade à la suppression) |
+| `firstName` | `String?` | Prénom |
+| `lastName` | `String?` | Nom |
+| `avatarUrl` | `String?` | URL de l'avatar |
+
+### `Cv` (table `cvs`)
+
+| Champ | Type | Détail |
+|---|---|---|
+| `userId` | `String` | Propriétaire (cascade à la suppression) |
+| `title` | `String` | Titre du CV (défaut `"Mon CV"`) |
+| `template` | `String` | Modèle (défaut `"classic"`) |
+| `accentColor` | `String` | Couleur d'accent (défaut `"#4F46E5"`) |
+| `photoUrl` | `String?` | Photo |
+| `fullName`, `jobTitle`, `email`, `phone`, `location`, `summary` | `String` | Champs texte de l'en-tête |
+| `experiences`, `education`, `skills`, `languages` | `Json` | Blocs structurés (défaut `[]`) |
+| `currentStep` | `Int` | Étape courante de l'assistant (défaut `1`) |
+| `completed` | `Boolean` | CV finalisé (défaut `false`) |
 
 ---
 
@@ -200,64 +237,65 @@ Les migrations sont dans `prisma/migrations/`. Le client est généré dans `gen
 
 Base URL par défaut : `http://localhost:3000`
 
-### Auth (sans token)
+### Authentification
 
-| Méthode | Route | Description |
-|---------|--------|-------------|
-| `POST` | `/auth/register` | Inscription (body: `email`, `password`) |
-| `POST` | `/auth/login` | Connexion (body: `email`, `password`) → renvoie un token JWT |
+| Méthode | Route | Auth | Description |
+|---|---|:---:|---|
+| `POST` | `/auth/register` | — | Inscription. Body : `email`, `password` (min. 8), `firstName`, `lastName`. Renvoie `access_token` + `user`. |
+| `POST` | `/auth/login` | — | Connexion. Body : `email`, `password`. Renvoie `access_token` + `user`. |
 
-### Utilisateur (JWT requis)
+### Compte utilisateur
 
-| Méthode | Route | Description |
-|---------|--------|-------------|
-| `GET` | `/me` | Utilisateur connecté + profil |
-| `PATCH` | `/me/profile` | Mise à jour profil (`fullName`, `avatarUrl`) |
-| `PATCH` | `/me/password` | Changement de mot de passe (body: `newPassword`) |
+| Méthode | Route | Auth | Description |
+|---|---|:---:|---|
+| `GET` | `/me` | JWT | Compte connecté et profil associé. |
+| `PATCH` | `/me/profile` | JWT | Met à jour le profil. Body : `firstName?`, `lastName?`, `avatarUrl?`. |
+| `PATCH` | `/me/password` | JWT | Change le mot de passe. Body : `newPassword`. |
 
-### CV (JWT requis)
+### CV
 
-| Méthode | Route | Description |
-|---------|--------|-------------|
-| `GET` | `/cvs` | Liste des CV de l'utilisateur |
-| `GET` | `/cvs/:id` | Détail d'un CV |
-| `GET` | `/cvs/:id/download` | Téléchargement du CV en PDF |
-| `POST` | `/cvs` | Création d'un CV (body: CreateCvDto) |
-| `PATCH` | `/cvs/:id` | Mise à jour (body: UpdateCvDto) |
-| `DELETE` | `/cvs/:id` | Suppression |
+| Méthode | Route | Auth | Description |
+|---|---|:---:|---|
+| `GET` | `/cvs` | JWT | Liste des CV de l'utilisateur (triés par date de mise à jour). |
+| `GET` | `/cvs/:id` | JWT | Détail d'un CV. |
+| `POST` | `/cvs` | JWT | Crée un CV. Body : `CreateCvDto` (`title` requis). |
+| `PATCH` | `/cvs/:id` | JWT | Met à jour un CV. Body : `UpdateCvDto`. |
+| `DELETE` | `/cvs/:id` | JWT | Supprime un CV. |
 
-Authentification : en-tête `Authorization: Bearer <token>` (ou cookie si configuré).
+### Contact
+
+| Méthode | Route | Auth | Description |
+|---|---|:---:|---|
+| `POST` | `/contact` | — | Envoie un e-mail de contact à `MAIL_TO`. Body : `name`, `email`, `message`. |
+
+**Authentification** — les routes protégées attendent l'en-tête `Authorization: Bearer <access_token>`.
 
 ---
 
 ## Tests
 
 ```bash
-# Tests unitaires
-npm run test
-
-# Avec couverture
-npm run test:cov
-
-# E2E
-npm run test:e2e
+npm run test        # tests unitaires
+npm run test:cov    # avec couverture
+npm run test:e2e    # tests end-to-end
 ```
 
-Les tests unitaires utilisent Jest (config dans `package.json`). Les E2E sont dans `test/` avec la config `test/jest-e2e.json`.
+Les tests unitaires reposent sur Jest (configuration dans [package.json](package.json)). Les tests end-to-end se trouvent dans [test/](test/) et utilisent `test/jest-e2e.json`.
 
 ---
 
 ## Déploiement
 
-1. **Build** : `npm run build`
-2. **Variables d'env** : définir toutes les variables obligatoires (et optionnelles selon besoin) sur la plateforme (Vercel, Railway, etc.).
-3. **Migrations** : exécuter `npx prisma migrate deploy` avant ou au démarrage.
-4. **Lancer** : `npm run start:prod` (ou `node dist/main`).
+1. Provisionner une base PostgreSQL et définir l'ensemble des variables d'environnement requises sur la plateforme d'hébergement.
+2. Installer les dépendances : `npm ci`.
+3. Générer le client Prisma et appliquer les migrations : `npx prisma generate && npx prisma migrate deploy`.
+4. Compiler : `npm run build`.
+5. Lancer : `npm run start:prod`.
 
-Pour un hébergement serverless, adapter le point d'entrée si nécessaire et s'assurer que la connexion base de données et Playwright (pour le PDF) sont supportées.
+> En production, restreignez l'origine CORS (actuellement ouverte à toutes les origines dans [src/main.ts](src/main.ts)) au domaine de votre front-end.
 
 ---
 
 ## Licence
 
-Projet privé (UNLICENSED). Voir `package.json`.
+Projet privé — **UNLICENSED**. Voir [package.json](package.json).
