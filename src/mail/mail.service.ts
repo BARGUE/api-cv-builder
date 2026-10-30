@@ -1,21 +1,29 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { ConfigService } from '@nestjs/config';
+import { ContactDto } from './dto/contact.dto';
 
-export interface ContactDto {
-    name: string;
-    email: string;
-    message: string;
-}
+const escapeHtml = (value: string) =>
+    value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
 
 @Injectable()
 export class MailService {
+    private readonly logger = new Logger(MailService.name);
+
     constructor(
         private readonly mailerService: MailerService,
         private readonly config: ConfigService,
     ) { }
 
-    async sendContact({ name, email, message }: ContactDto) {
+    async sendContact(dto: ContactDto) {
+        const name = escapeHtml(dto.name);
+        const email = escapeHtml(dto.email);
+        const message = escapeHtml(dto.message);
         const appName = 'CV Builder';
         const date = new Date().toLocaleDateString('fr-FR', {
             day: '2-digit',
@@ -88,7 +96,7 @@ export class MailService {
       </div>
       <div class="message-wrap">
         <p class="label" style="margin-bottom:12px;">Message</p>
-        <div class="message-body">${message.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</div>
+        <div class="message-body">${message}</div>
       </div>
       <div class="cta-wrap">
         <a href="mailto:${email}" class="cta-btn">Répondre au message</a>
@@ -106,11 +114,16 @@ export class MailService {
 </body>
 </html>`;
 
-        await this.mailerService.sendMail({
-            to: this.config.get<string>('MAIL_TO'),
-            replyTo: email,
-            subject: `[Contact] Message de ${name}`,
-            html,
-        });
+        try {
+            await this.mailerService.sendMail({
+                to: this.config.get<string>('MAIL_TO'),
+                replyTo: dto.email,
+                subject: `[Contact] Message de ${dto.name}`,
+                html,
+            });
+        } catch (error) {
+            this.logger.error(`Échec de l'envoi du mail de contact`, error instanceof Error ? error.stack : error);
+            throw new ServiceUnavailableException("Le message n'a pas pu être envoyé, réessayez plus tard");
+        }
     }
 }

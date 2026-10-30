@@ -50,8 +50,6 @@ API REST construite avec **NestJS 11** pour la gestion de comptes utilisateurs, 
 - **CV** — CRUD complet des CV rattachés à l'utilisateur, avec blocs structurés (expériences, formation, compétences, langues).
 - **Contact** — envoi d'un e-mail de contact formaté en HTML à une adresse de destination configurée.
 
-> **Note** — Certaines dépendances présentes dans `package.json` (Playwright, `pdf-parse`, SDK Anthropic, React Email) sont destinées à des fonctionnalités futures (export PDF, import de CV, assistance IA) et **ne sont pas encore branchées** dans le code de l'API.
-
 ---
 
 ## Prérequis
@@ -87,7 +85,9 @@ Créez un fichier `.env` à la racine du projet. Les variables sont **validées 
 | `MAIL_PASS` | ✅ | Mot de passe d'application Gmail | *(voir ci-dessous)* |
 | `MAIL_TO` | ✅ | Adresse destinataire du formulaire de contact | `you@example.com` |
 | `PORT` | ❌ | Port d'écoute (défaut : `3000`) | `3000` |
-| `ANTHROPIC_API_KEY` | ❌ | Clé API Anthropic (fonctionnalités IA à venir) | `sk-ant-...` |
+| `JWT_EXPIRES_IN` | ❌ | Durée de validité des JWT (défaut : `1h`) | `1h`, `7d` |
+| `TRUST_PROXY` | ❌ | Nombre de reverse proxies devant l’API, pour lire la vraie IP client (défaut : `0`) | `1` |
+| `ANTHROPIC_API_KEY` | ❌ | Clé API Anthropic (non utilisée pour l’instant) | `sk-ant-...` |
 
 ### Exemple de `.env`
 
@@ -182,7 +182,6 @@ api-cv-builder/
 │   │   └── env.schema.ts     # Schéma Zod des variables d'environnement
 │   ├── auth/                # Inscription, connexion, JWT, guard, stratégie
 │   ├── cvs/                 # CRUD des CV
-│   ├── users/               # Module utilisateurs
 │   ├── mail/                # Formulaire de contact (POST /contact)
 │   └── prisma/              # Module et service Prisma
 ├── test/                    # Tests end-to-end
@@ -250,7 +249,7 @@ Base URL par défaut : `http://localhost:3000`
 |---|---|:---:|---|
 | `GET` | `/me` | JWT | Compte connecté et profil associé. |
 | `PATCH` | `/me/profile` | JWT | Met à jour le profil. Body : `firstName?`, `lastName?`, `avatarUrl?`. |
-| `PATCH` | `/me/password` | JWT | Change le mot de passe. Body : `newPassword`. |
+| `PATCH` | `/me/password` | JWT | Change le mot de passe. Body : `currentPassword`, `newPassword` (min. 8). Renvoie 401 si le mot de passe actuel est incorrect. |
 
 ### CV
 
@@ -266,7 +265,7 @@ Base URL par défaut : `http://localhost:3000`
 
 | Méthode | Route | Auth | Description |
 |---|---|:---:|---|
-| `POST` | `/contact` | — | Envoie un e-mail de contact à `MAIL_TO`. Body : `name`, `email`, `message`. |
+| `POST` | `/contact` | — | Envoie un e-mail de contact à `MAIL_TO`. Body : `name`, `email`, `message`. Limité à 5 envois par heure et par IP (429 au-delà). |
 
 **Authentification** — les routes protégées attendent l'en-tête `Authorization: Bearer <access_token>`.
 
@@ -291,6 +290,8 @@ Les tests unitaires reposent sur Jest (configuration dans [package.json](package
 3. Générer le client Prisma et appliquer les migrations : `npx prisma generate && npx prisma migrate deploy`.
 4. Compiler : `npm run build`.
 5. Lancer : `npm run start:prod`.
+
+> Si l’API est derrière un reverse proxy (Render, Railway, Nginx…), définissez `TRUST_PROXY=1` : sinon la limite anti-spam de `/contact` est partagée par tous les visiteurs.
 
 > En production, restreignez l'origine CORS (actuellement ouverte à toutes les origines dans [src/main.ts](src/main.ts)) au domaine de votre front-end.
 

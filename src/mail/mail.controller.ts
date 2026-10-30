@@ -1,7 +1,9 @@
-import { Body, Controller, Post, HttpCode, HttpStatus } from '@nestjs/common';
+import { Body, Controller, Post, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { MailService } from './mail.service';
-import type { ContactDto } from './mail.service';
+import { ContactDto } from './dto/contact.dto';
 
+@UseGuards(ThrottlerGuard)
 @Controller('contact')
 export class MailController {
     constructor(private readonly mailService: MailService) { }

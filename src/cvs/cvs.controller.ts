@@ -1,40 +1,37 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, UseGuards, StreamableFile } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { CurrentUser, type JwtUser } from '../auth/current-user.decorator';
 import { CvsService } from './cvs.service';
 import { CreateCvDto } from './dto/create-cv.dto';
 import { UpdateCvDto } from './dto/update-cv.dto';
 
+@UseGuards(JwtAuthGuard)
 @Controller('cvs')
 export class CvsController {
     constructor(private cvs: CvsService) { }
 
-    @UseGuards(JwtAuthGuard)
     @Get()
-    findAll(@Req() req: any) {
-        return this.cvs.findAll(req.user.userId);
+    findAll(@CurrentUser() user: JwtUser) {
+        return this.cvs.findAll(user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Get(':id')
-    findOne(@Param('id') id: string, @Req() req: any) {
-        return this.cvs.findOne(id, req.user.userId);
+    findOne(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+        return this.cvs.findOne(id, user.userId);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Post()
-    create(@Body() dto: CreateCvDto, @Req() req: any) {
-        return this.cvs.create(req.user.userId, dto);
+    create(@Body() dto: CreateCvDto, @CurrentUser() user: JwtUser) {
+        return this.cvs.create(user.userId, dto);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Patch(':id')
-    update(@Param('id') id: string, @Body() dto: UpdateCvDto, @Req() req: any) {
-        return this.cvs.update(id, req.user.userId, dto);
+    update(@Param('id') id: string, @Body() dto: UpdateCvDto, @CurrentUser() user: JwtUser) {
+        return this.cvs.update(id, user.userId, dto);
     }
 
-    @UseGuards(JwtAuthGuard)
     @Delete(':id')
-    remove(@Param('id') id: string, @Req() req: any) {
-        return this.cvs.remove(id, req.user.userId);
+    remove(@Param('id') id: string, @CurrentUser() user: JwtUser) {
+        return this.cvs.remove(id, user.userId);
     }
 }

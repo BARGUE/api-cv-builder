@@ -25,7 +25,7 @@ import { MailModule } from './mail/mail.module';
     PrismaModule,
     AuthModule,
     CvsModule,
-    MailModule
+    MailModule,
   ],
   controllers: [AppController],
 })

@@ -1,4 +1,4 @@
-import { IsString, IsOptional, MinLength, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, MinLength, IsInt, Min, IsBoolean, IsArray } from 'class-validator';
 
 export class CreateCvDto {
     @IsString()
@@ -41,19 +41,24 @@ export class CreateCvDto {
     @IsOptional()
     summary?: string;
 
+    @IsArray()
     @IsOptional()
     experiences?: unknown;
 
+    @IsArray()
     @IsOptional()
     education?: unknown;
 
+    @IsArray()
     @IsOptional()
     skills?: unknown;
 
+    @IsArray()
     @IsOptional()
     languages?: unknown;
 
-    @IsNumber()
+    @IsInt()
+    @Min(1)
     @IsOptional()
     currentStep?: number;
 

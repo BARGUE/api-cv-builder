@@ -60,5 +60,6 @@ model Cv {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
+  @@index([userId, updatedAt(sort: Desc)])
   @@map("cvs")
 }

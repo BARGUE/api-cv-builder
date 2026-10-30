@@ -1,6 +1,7 @@
-import { Controller, Get, Patch, Req, UseGuards, Body } from '@nestjs/common';
+import { Controller, Get, Patch, UseGuards, Body, UnauthorizedException } from '@nestjs/common';
 import { IsOptional, IsString } from 'class-validator';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
+import { CurrentUser, type JwtUser } from './auth/current-user.decorator';
 import { AuthService } from './auth/auth.service';
 import { ChangePasswordDto } from './auth/dto/change-password.dto';
 import { PrismaService } from './prisma/prisma.service';
@@ -28,9 +29,9 @@ export class AppController {
 
   @UseGuards(JwtAuthGuard)
   @Get('me')
-  async me(@Req() req: { user: { userId: string; email: string } }) {
+  async me(@CurrentUser() current: JwtUser) {
     const user = await this.prisma.user.findUnique({
-      where: { id: req.user.userId },
+      where: { id: current.userId },
       select: {
         id: true,
         email: true,
@@ -48,7 +49,7 @@ export class AppController {
         },
       },
     });
-    if (!user) return req.user;
+    if (!user) throw new UnauthorizedException('Compte introuvable');
     return {
       id: user.id,
       email: user.email,
@@ -62,13 +63,13 @@ export class AppController {
   @UseGuards(JwtAuthGuard)
   @Patch('me/profile')
   async updateProfile(
-    @Req() req: { user: { userId: string } },
+    @CurrentUser() current: JwtUser,
     @Body() body: UpdateProfileDto,
   ) {
     const profile = await this.prisma.profile.upsert({
-      where: { userId: req.user.userId },
+      where: { userId: current.userId },
       create: {
-        userId: req.user.userId,
+        userId: current.userId,
         firstName: body.firstName ?? null,
         lastName: body.lastName ?? null,
         avatarUrl: body.avatarUrl ?? null,
@@ -93,10 +94,10 @@ export class AppController {
   @UseGuards(JwtAuthGuard)
   @Patch('me/password')
   async changePassword(
-    @Req() req: { user: { userId: string } },
+    @CurrentUser() current: JwtUser,
     @Body() body: ChangePasswordDto,
   ) {
-    await this.auth.changePassword(req.user.userId, body.newPassword);
+    await this.auth.changePassword(current.userId, body.currentPassword, body.newPassword);
     return { ok: true };
   }
 }
